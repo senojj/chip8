@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"math/rand/v2"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -63,8 +64,8 @@ func (d *delay) Value() uint8 {
 	return d.timer
 }
 
-func (d *delay) Add(n uint8) {
-	d.timer += n
+func (d *delay) Set(n uint8) {
+	d.timer = n
 }
 
 func (d *delay) Dec() {
@@ -82,9 +83,9 @@ func (s *sound) Value() uint8 {
 	return s.timer
 }
 
-func (s *sound) Add(n uint8) {
+func (s *sound) Set(n uint8) {
 	current := s.timer
-	s.timer += n
+	s.timer = n
 
 	if current == 0 && s.timer > 0 {
 		err := s.beep.Start(context.Background())
@@ -146,13 +147,13 @@ func (e *Emulator) onKeyUp(k *fyne.KeyEvent) {
 	}
 }
 
-func (e *Emulator) drawSprite(buffer []byte, x, y, height byte) {
-	startX := uint16(x) % uint16(width)
-	startY := uint16(y) % uint16(height)
+func (e *Emulator) drawSprite(buffer []byte, x, y, h byte) {
+	startX := uint16(x) & uint16(width-1)
+	startY := uint16(y) & uint16(height-1)
 
 	e.v[0xF] = 0 // Reset the collision register.
 
-	for row := uint16(0); row < uint16(height); row++ {
+	for row := uint16(0); row < uint16(h); row++ {
 		if startY+row >= uint16(height) {
 			// Reached the bottom of the display.
 			break
@@ -245,25 +246,181 @@ func (e *Emulator) Run() error {
 
 			switch kind {
 			case 0x0:
-				if opcode == 0x00E0 {
+				switch opcode {
+				case 0x00E0:
+					// Clear the screen
 					for i := range display {
 						display[i] = 0
 					}
 					redraw = true
+				case 0x00EE:
+					// Return from subroutine
+					item := e.stack
+					if item == nil {
+						panic("return from empty stack")
+					}
+					e.pc = item.value
+					e.stack = item.next
+				default:
+					panic("unknown 0x0 opcode")
 				}
 			case 0x1:
+				// Jump to location
 				e.pc = nnn
+			case 0x2:
+				// Call subroutine
+				item := &node{
+					value: e.pc,
+					next:  e.stack,
+				}
+				e.stack = item
+				e.pc = nnn
+			case 0x3:
+				if e.v[x] == byte(nn) {
+					e.pc += 2
+				}
+			case 0x4:
+				if e.v[x] != byte(nn) {
+					e.pc += 2
+				}
+			case 0x5:
+				if e.v[x] == e.v[y] {
+					e.pc += 2
+				}
 			case 0x6:
+				// Set register
 				e.v[x] = byte(nn)
 			case 0x7:
+				// Add to register
 				x := (opcode & 0x0F00) >> 8
 				nn := byte(opcode & 0x00FF)
 				e.v[x] += nn
+			case 0x8:
+				switch n {
+				case 0x0:
+					e.v[x] = e.v[y]
+				case 0x1:
+					e.v[0xF] = 0
+					e.v[x] |= e.v[y]
+				case 0x2:
+					e.v[0xF] = 0
+					e.v[x] &= e.v[y]
+				case 0x3:
+					e.v[0xF] = 0
+					e.v[x] ^= e.v[y]
+				case 0x4:
+					sum := uint16(e.v[x]) + uint16(e.v[y])
+					e.v[0xF] = 0
+					if sum > 255 {
+						e.v[0xF] = 1
+					}
+					e.v[x] = byte(sum & 0xFF)
+				case 0x5:
+					e.v[0xF] = 0
+					if e.v[x] >= e.v[y] {
+						e.v[0xF] = 1
+					}
+					e.v[x] -= e.v[y]
+				case 0x6:
+					e.v[0xF] = e.v[x] & 0x1
+					e.v[x] >>= 1
+				case 0x7:
+					e.v[0xF] = 0
+					if e.v[y] >= e.v[x] {
+						e.v[0xF] = 1
+					}
+					e.v[x] = e.v[y] - e.v[x]
+				case 0xE:
+					e.v[0xF] = (e.v[x] & 0x80) >> 7
+					e.v[x] <<= 1
+				}
+			case 0x9:
+				if e.v[x] != e.v[y] {
+					e.pc += 2
+				}
 			case 0xA:
+				// Set index
 				e.i = nnn
+			case 0xB:
+				e.pc = nnn + uint16(e.v[0x0])
+			case 0xC:
+				randomByte := byte(rand.Uint32N(256))
+				e.v[x] = randomByte & byte(nn)
 			case 0xD:
 				e.drawSprite(display[:], e.v[x], e.v[y], byte(n))
 				redraw = true
+			case 0xE:
+				key := e.v[x] & 0x0F
+
+				switch nn {
+				case 0x9E:
+					if e.keyState[key].Load() {
+						e.pc += 2
+					}
+				case 0xA1:
+					if !e.keyState[key].Load() {
+						e.pc += 2
+					}
+				default:
+					panic("unknown 0xE opcode")
+				}
+			case 0xF:
+				switch nn {
+				case 0x07:
+					e.v[x] = e.delay.Value()
+				case 0x0A:
+					var keyPressed bool
+
+					for i := uint8(0); i < uint8(len(e.keyState)); i++ {
+						if e.keyState[i].Load() {
+							keyPressed = true
+							e.v[x] = i
+							break
+						}
+					}
+
+					if !keyPressed {
+						e.pc -= 2
+					}
+				case 0x15:
+					e.delay.Set(e.v[x])
+				case 0x18:
+					e.sound.Set(e.v[x])
+				case 0x1E:
+					e.i += uint16(e.v[x])
+				case 0x29:
+					digit := uint16(e.v[x] & 0x0F)
+					e.i = FontStartAddress + (digit * 5)
+				case 0x33:
+					val := uint32(e.v[x])
+
+					// Double dabble algorithm
+					var bcd uint32
+
+					// Iterate 8 times (once for each bit of the input byte)
+					for i := 0; i < 8; i++ {
+						// 1. Check each BCD nibble. If >= 5, add 3.
+						// Hundreds (bits 8-11), Tens (bits 4-7), Ones (bits 0-3)
+						if (bcd & 0x00F) >= 5 {
+							bcd += 3
+						}
+						if (bcd & 0x0F0) >= 0x050 {
+							bcd += 0x030
+						}
+						if (bcd & 0xF00) >= 0x500 {
+							bcd += 0x300
+						}
+
+						// 2. Shift BCD left by 1, and pull in the next bit from 'val'
+						bcd = (bcd << 1) | ((val >> (7 - i)) & 1)
+					}
+
+					e.memory[e.i] = byte((bcd >> 8) & 0xF)   // Hundreds
+					e.memory[e.i+1] = byte((bcd >> 4) & 0xF) // Tens
+					e.memory[e.i+2] = byte(bcd & 0xF)        // Ones
+				default:
+					panic("unknown 0xF opcode")
+				}
 			}
 
 			if redraw {
