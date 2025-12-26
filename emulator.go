@@ -150,7 +150,34 @@ func (e *Emulator) drawSprite(buffer []byte, x, y, height byte) {
 	startX := uint16(x) % uint16(width)
 	startY := uint16(y) % uint16(height)
 
-	e.v[0xF] = 0
+	e.v[0xF] = 0 // Reset the collision register.
+
+	for row := uint16(0); row < uint16(height); row++ {
+		if startY+row >= uint16(height) {
+			// Reached the bottom of the display.
+			break
+		}
+
+		sprite := e.memory[e.i+row]
+
+		for col := uint16(0); col < 8; col++ {
+			if startX+col >= uint16(width) {
+				break
+			}
+
+			if (sprite & (0x80 >> col)) != 0 {
+				index := (startX + col) + ((startY + row) * uint16(width))
+
+				if buffer[index] == 1 {
+					// Pixel was already on. This indicates a graphical object collision.
+					e.v[0xF] = 1 // Turn on the collision register.
+					buffer[index] = 0
+				} else {
+					buffer[index] = 1
+				}
+			}
+		}
+	}
 }
 
 func (e *Emulator) Run() error {
@@ -225,30 +252,30 @@ func (e *Emulator) Run() error {
 					redraw = true
 				}
 			case 0x1:
-
+				e.pc = nnn
 			case 0x6:
-
+				e.v[x] = byte(nn)
 			case 0x7:
-
+				x := (opcode & 0x0F00) >> 8
+				nn := byte(opcode & 0x00FF)
+				e.v[x] += nn
 			case 0xA:
-
+				e.i = nnn
 			case 0xD:
-				// DXYN: Draw sprite at (VX, VY) with height N
-				cpu.DrawSprite(cpu.V[x], cpu.V[y], byte(n))
+				e.drawSprite(display[:], e.v[x], e.v[y], byte(n))
 				redraw = true
-			}
-			// Execute Opcode
-
-			for i, val := range display {
-				x, y := i%width, i/width
-				c := color.Black
-				if val == 1 {
-					c = color.White
-				}
-				buffer.Set(x, y, c) // Directly sets pixels in the buffer
 			}
 
 			if redraw {
+				for i, val := range display {
+					x, y := i%width, i/width
+					c := color.Black
+					if val == 1 {
+						c = color.White
+					}
+					buffer.Set(x, y, c) // Directly sets pixels in the buffer
+				}
+
 				fyne.Do(func() {
 					image.Refresh()
 				})
