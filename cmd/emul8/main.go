@@ -1,14 +1,14 @@
 package main
 
 import (
-	"chip8"
+	"emul8"
 	"io"
 	"log"
 	"os"
 )
 
 func main() {
-	var e chip8.Emulator
+	var e emul8.Emulator
 
 	f, err := os.Open("ibm_logo.ch8")
 	if err != nil {
@@ -20,7 +20,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	e.Load(b)
+	err = e.Load(b)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	err = e.Run()
 	if err != nil {

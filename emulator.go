@@ -1,4 +1,4 @@
-package chip8
+package emul8
 
 import (
 	"context"
@@ -418,6 +418,14 @@ func (e *Emulator) Run() error {
 					e.memory[e.i] = byte((bcd >> 8) & 0xF)   // Hundreds
 					e.memory[e.i+1] = byte((bcd >> 4) & 0xF) // Tens
 					e.memory[e.i+2] = byte(bcd & 0xF)        // Ones
+				case 0x55:
+					for i := uint16(0); i <= x; i++ {
+						e.memory[e.i+i] = e.v[i]
+					}
+				case 0x65:
+					for i := uint16(0); i <= x; i++ {
+						e.v[i] = e.memory[e.i+i]
+					}
 				default:
 					panic("unknown 0xF opcode")
 				}

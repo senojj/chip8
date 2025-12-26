@@ -1,4 +1,4 @@
-module chip8
+module emul8
 
 go 1.25.5
 
