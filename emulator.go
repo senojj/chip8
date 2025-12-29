@@ -104,6 +104,11 @@ func (s *sound) Dec() error {
 	return nil
 }
 
+func (s *sound) Stop() error {
+	s.timer = 0
+	return s.beep.Stop()
+}
+
 type node struct {
 	value uint16
 	next  *node
@@ -207,6 +212,10 @@ func (e *Emulator) Run() error {
 	var g errgroup.Group
 
 	g.Go(func() error {
+		defer func() {
+			_ = e.sound.Stop()
+		}()
+
 		lastTimerUpdate := time.Now()
 
 		cpuTicker := time.NewTicker(clockCPU)
