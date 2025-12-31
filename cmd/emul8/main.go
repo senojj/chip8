@@ -25,13 +25,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = e.Load(b)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = e.Run()
-	if err != nil {
-		log.Fatal(err)
-	}
+	e.Load(b)
+	e.Run()
 }
