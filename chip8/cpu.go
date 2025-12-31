@@ -162,6 +162,10 @@ func DrawSprite(x, y, h byte) {
 	}
 }
 
+func ProgramCounter() uint16 {
+	return cpu.pc
+}
+
 func Opcode() uint16 {
 	var buffer [2]byte
 	read := Read(cpu.pc, buffer[:])
