@@ -23,26 +23,25 @@ var keyMap = map[fyne.KeyName]uint8{
 }
 
 type Emulator struct {
-	cpu     chip8.Processor
 	beep    Beep
 	running atomic.Bool
 }
 
 func (e *Emulator) onKeyDown(k *fyne.KeyEvent) {
 	if hex, ok := keyMap[k.Name]; ok {
-		e.cpu.SetKey(hex, true)
+		chip8.SetKey(hex, true)
 	}
 }
 
 func (e *Emulator) onKeyUp(k *fyne.KeyEvent) {
 	if hex, ok := keyMap[k.Name]; ok {
-		e.cpu.SetKey(hex, false)
+		chip8.SetKey(hex, false)
 	}
 }
 
 func (e *Emulator) Load(b []byte) {
-	chip8.Initialize(&e.cpu)
-	chip8.Load(&e.cpu, b)
+	chip8.Reset()
+	chip8.Load(b)
 }
 
 func (e *Emulator) Run() {
@@ -78,16 +77,12 @@ func (e *Emulator) Run() {
 		cpuTicker := time.NewTicker(chip8.ClockRate)
 		defer cpuTicker.Stop()
 
-		var info uint8
-
 		for range cpuTicker.C {
 			if !e.running.Load() {
 				break
 			}
 
-			rawcode := e.cpu.Step()
-			opcode := chip8.Decode(rawcode)
-			e.cpu.Execute(opcode, &info)
+			info := chip8.Step()
 
 			redraw := (info & chip8.Redraw) != 0
 			sound := (info & chip8.Sound) != 0
@@ -99,7 +94,7 @@ func (e *Emulator) Run() {
 			}
 
 			if redraw {
-				for i, val := range e.cpu.Display() {
+				for i, val := range chip8.Display() {
 					x, y := i%chip8.Width, i/chip8.Width
 					c := color.Black
 					if val == 1 {

@@ -48,7 +48,7 @@ type node struct {
 	next  *node
 }
 
-type Processor struct {
+type processor struct {
 	memory          [4096]byte
 	v               [16]byte
 	keyState        [16]atomic.Bool
@@ -61,7 +61,13 @@ type Processor struct {
 	lastTimerUpdate time.Time
 }
 
-func Initialize(cpu *Processor) {
+var cpu processor
+
+func init() {
+	Reset()
+}
+
+func Reset() {
 	for i := range len(cpu.memory) {
 		cpu.memory[i] = 0
 	}
@@ -87,13 +93,13 @@ func Initialize(cpu *Processor) {
 	var t time.Time
 	cpu.lastTimerUpdate = t
 
-	written := cpu.Write(FontStartAddress, fontSet)
+	written := Write(FontStartAddress, fontSet)
 	if int(written) < len(fontSet) {
 		panic("insufficient memory to write font set")
 	}
 }
 
-func (cpu *Processor) Write(loc uint16, data []byte) uint16 {
+func Write(loc uint16, data []byte) uint16 {
 	var i uint16
 	for ; loc+i < 0xFFF && int(i) < len(data); i++ {
 		cpu.memory[loc+i] = data[i]
@@ -101,7 +107,7 @@ func (cpu *Processor) Write(loc uint16, data []byte) uint16 {
 	return i
 }
 
-func (cpu *Processor) Read(loc uint16, data []byte) uint16 {
+func Read(loc uint16, data []byte) uint16 {
 	var i uint16
 	for ; loc+i < 0xFFF && int(i) < len(data); i++ {
 		data[i] = cpu.memory[loc+i]
@@ -109,22 +115,22 @@ func (cpu *Processor) Read(loc uint16, data []byte) uint16 {
 	return i
 }
 
-func (cpu *Processor) Display() []byte {
+func Display() []byte {
 	return cpu.display[:]
 }
 
-func Load(cpu *Processor, b []byte) {
-	written := cpu.Write(ProgramStartAddress, b)
+func Load(b []byte) {
+	written := Write(ProgramStartAddress, b)
 	if int(written) < len(b) {
 		panic("insufficient memory")
 	}
 }
 
-func (cpu *Processor) SetKey(key uint8, value bool) {
+func SetKey(key uint8, value bool) {
 	cpu.keyState[key&0x0F].Store(value)
 }
 
-func (cpu *Processor) DrawSprite(x, y, h byte) {
+func DrawSprite(x, y, h byte) {
 	startX := uint16(x) & uint16(Width-1)
 	startY := uint16(y) & uint16(Height-1)
 
@@ -156,9 +162,9 @@ func (cpu *Processor) DrawSprite(x, y, h byte) {
 	}
 }
 
-func (cpu *Processor) Step() uint16 {
+func Opcode() uint16 {
 	var buffer [2]byte
-	read := cpu.Read(cpu.pc, buffer[:])
+	read := Read(cpu.pc, buffer[:])
 	if read < 2 {
 		panic("program runaway")
 	}
@@ -167,18 +173,17 @@ func (cpu *Processor) Step() uint16 {
 	// in memory, starting at the program counter
 	high := uint16(buffer[0]) // high-order bits of opcode
 	low := uint16(buffer[1])  // low-order bits of opcode
+	return (high << 8) | low
+}
+
+func Step() uint8 {
+	var info uint8
+
+	opcode := Opcode()
 
 	cpu.pc += 2
 
-	opcode := (high << 8) | low
-
-	return opcode
-}
-
-func (cpu *Processor) Execute(opcode OpCode, info *uint8) {
-	*info &^= Redraw | Sound | Delay
-
-	opcode.Execute(cpu, info)
+	decode(opcode).Execute(&info)
 
 	if time.Since(cpu.lastTimerUpdate) >= TimerRate {
 		if cpu.sound > 0 {
@@ -192,10 +197,11 @@ func (cpu *Processor) Execute(opcode OpCode, info *uint8) {
 	}
 
 	if cpu.sound > 0 {
-		*info |= Sound
+		info |= Sound
 	}
 
 	if cpu.delay > 0 {
-		*info |= Delay
+		info |= Delay
 	}
+	return info
 }

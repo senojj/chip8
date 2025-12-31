@@ -4,24 +4,24 @@ import (
 	"math/rand/v2"
 )
 
-type OpCode interface {
-	Execute(*Processor, *uint8)
+type operation interface {
+	Execute(*uint8)
 }
 
-type ClearScreen struct{}
+type opClearScreen struct{}
 
-func (o *ClearScreen) Execute(cpu *Processor, info *uint8) {
+func (o *opClearScreen) Execute(info *uint8) {
 	for i := range cpu.display {
 		cpu.display[i] = 0
 	}
 	*info |= Redraw
 }
 
-type SubroutineCall struct {
+type opSubroutineCall struct {
 	nnn uint16
 }
 
-func (o *SubroutineCall) Execute(cpu *Processor, _ *uint8) {
+func (o *opSubroutineCall) Execute(_ *uint8) {
 	item := &node{
 		value: cpu.pc,
 		next:  cpu.stack,
@@ -30,9 +30,9 @@ func (o *SubroutineCall) Execute(cpu *Processor, _ *uint8) {
 	cpu.pc = o.nnn
 }
 
-type SubroutineReturn struct{}
+type opSubroutineReturn struct{}
 
-func (o *SubroutineReturn) Execute(cpu *Processor, _ *uint8) {
+func (o *opSubroutineReturn) Execute(_ *uint8) {
 	item := cpu.stack
 	if item == nil {
 		panic("return from empty stack")
@@ -41,132 +41,132 @@ func (o *SubroutineReturn) Execute(cpu *Processor, _ *uint8) {
 	cpu.stack = item.next
 }
 
-type JumpToLocation struct {
+type opJumpToLocation struct {
 	nnn uint16
 }
 
-func (o *JumpToLocation) Execute(cpu *Processor, _ *uint8) {
+func (o *opJumpToLocation) Execute(_ *uint8) {
 	cpu.pc = o.nnn
 }
 
-type JumpWithOffset struct {
+type opJumpWithOffset struct {
 	nnn uint16
 }
 
-func (o *JumpWithOffset) Execute(cpu *Processor, _ *uint8) {
+func (o *opJumpWithOffset) Execute(_ *uint8) {
 	cpu.pc = o.nnn + uint16(cpu.v[0x0])
 }
 
-type StepIfXEqualsNN struct {
+type opStepIfXEqualsNN struct {
 	x  uint16
 	nn uint16
 }
 
-func (o *StepIfXEqualsNN) Execute(cpu *Processor, _ *uint8) {
+func (o *opStepIfXEqualsNN) Execute(_ *uint8) {
 	if cpu.v[o.x] == byte(o.nn) {
 		cpu.pc += 2
 	}
 }
 
-type StepIfXNotEqualsNN struct {
+type opStepIfXNotEqualsNN struct {
 	x  uint16
 	nn uint16
 }
 
-func (o *StepIfXNotEqualsNN) Execute(cpu *Processor, _ *uint8) {
+func (o *opStepIfXNotEqualsNN) Execute(_ *uint8) {
 	if cpu.v[o.x] != byte(o.nn) {
 		cpu.pc += 2
 	}
 }
 
-type StepIfXEqualsY struct {
+type opStepIfXEqualsY struct {
 	x uint16
 	y uint16
 }
 
-func (o *StepIfXEqualsY) Execute(cpu *Processor, _ *uint8) {
+func (o *opStepIfXEqualsY) Execute(_ *uint8) {
 	if cpu.v[o.x] == cpu.v[o.y] {
 		cpu.pc += 2
 	}
 }
 
-type StepIfXNotEqualsY struct {
+type opStepIfXNotEqualsY struct {
 	x uint16
 	y uint16
 }
 
-func (o *StepIfXNotEqualsY) Execute(cpu *Processor, _ *uint8) {
+func (o *opStepIfXNotEqualsY) Execute(_ *uint8) {
 	if cpu.v[o.x] != cpu.v[o.y] {
 		cpu.pc += 2
 	}
 }
 
-type SetXToNN struct {
+type opSetXToNN struct {
 	x  uint16
 	nn uint16
 }
 
-func (o *SetXToNN) Execute(cpu *Processor, _ *uint8) {
+func (o *opSetXToNN) Execute(_ *uint8) {
 	cpu.v[o.x] = byte(o.nn)
 }
 
-type AddNNToX struct {
+type opAddNNToX struct {
 	x  uint16
 	nn uint16
 }
 
-func (o *AddNNToX) Execute(cpu *Processor, _ *uint8) {
+func (o *opAddNNToX) Execute(_ *uint8) {
 	cpu.v[o.x] += byte(o.nn)
 }
 
-type SetXToY struct {
+type opSetXToY struct {
 	x uint16
 	y uint16
 }
 
-func (o *SetXToY) Execute(cpu *Processor, _ *uint8) {
+func (o *opSetXToY) Execute(_ *uint8) {
 	cpu.v[o.x] = cpu.v[o.y]
 }
 
-type OrXY struct {
+type opOrXY struct {
 	x uint16
 	y uint16
 }
 
-func (o *OrXY) Execute(cpu *Processor, _ *uint8) {
+func (o *opOrXY) Execute(_ *uint8) {
 	// This operation traditionally resets the carry flag.
 	cpu.v[CarryFlag] = 0
 	cpu.v[o.x] |= cpu.v[o.y]
 }
 
-type AndXY struct {
+type opAndXY struct {
 	x uint16
 	y uint16
 }
 
-func (o *AndXY) Execute(cpu *Processor, _ *uint8) {
+func (o *opAndXY) Execute(_ *uint8) {
 	// This operation traditionally resets the carry flag.
 	cpu.v[CarryFlag] = 0
 	cpu.v[o.x] &= cpu.v[o.y]
 }
 
-type XOrXY struct {
+type opXOrXY struct {
 	x uint16
 	y uint16
 }
 
-func (o *XOrXY) Execute(cpu *Processor, _ *uint8) {
+func (o *opXOrXY) Execute(_ *uint8) {
 	// This operation traditionally resets the carry flag.
 	cpu.v[CarryFlag] = 0
 	cpu.v[o.x] ^= cpu.v[o.y]
 }
 
-type AddXY struct {
+type opAddXY struct {
 	x uint16
 	y uint16
 }
 
-func (o *AddXY) Execute(cpu *Processor, _ *uint8) {
+func (o *opAddXY) Execute(_ *uint8) {
 	sum := uint16(cpu.v[o.x]) + uint16(cpu.v[o.y])
 	// This operation traditionally resets the carry flag.
 	cpu.v[CarryFlag] = 0
@@ -176,12 +176,12 @@ func (o *AddXY) Execute(cpu *Processor, _ *uint8) {
 	cpu.v[o.x] = byte(sum & 0xFF)
 }
 
-type SubtractYFromX struct {
+type opSubtractYFromX struct {
 	x uint16
 	y uint16
 }
 
-func (o *SubtractYFromX) Execute(cpu *Processor, _ *uint8) {
+func (o *opSubtractYFromX) Execute(_ *uint8) {
 	cpu.v[CarryFlag] = 0
 	if cpu.v[o.x] >= cpu.v[o.y] {
 		cpu.v[CarryFlag] = 1
@@ -189,12 +189,12 @@ func (o *SubtractYFromX) Execute(cpu *Processor, _ *uint8) {
 	cpu.v[o.x] -= cpu.v[o.y]
 }
 
-type SubtractXFromY struct {
+type opSubtractXFromY struct {
 	x uint16
 	y uint16
 }
 
-func (o *SubtractXFromY) Execute(cpu *Processor, _ *uint8) {
+func (o *opSubtractXFromY) Execute(_ *uint8) {
 	cpu.v[CarryFlag] = 0
 	if cpu.v[o.y] >= cpu.v[o.x] {
 		cpu.v[CarryFlag] = 1
@@ -202,88 +202,88 @@ func (o *SubtractXFromY) Execute(cpu *Processor, _ *uint8) {
 	cpu.v[o.x] = cpu.v[o.y] - cpu.v[o.x]
 }
 
-type ShiftRightX struct {
+type opShiftRightX struct {
 	x uint16
 }
 
-func (o *ShiftRightX) Execute(cpu *Processor, _ *uint8) {
+func (o *opShiftRightX) Execute(_ *uint8) {
 	cpu.v[CarryFlag] = cpu.v[o.x] & 0x1
 	cpu.v[o.x] >>= 1
 }
 
-type ShiftLeftX struct {
+type opShiftLeftX struct {
 	x uint16
 }
 
-func (o *ShiftLeftX) Execute(cpu *Processor, _ *uint8) {
+func (o *opShiftLeftX) Execute(_ *uint8) {
 	cpu.v[CarryFlag] = (cpu.v[o.x] & 0x80) >> 7
 	cpu.v[o.x] <<= 1
 }
 
-type SetIToNNN struct {
+type opSetIToNNN struct {
 	nnn uint16
 }
 
-func (o *SetIToNNN) Execute(cpu *Processor, _ *uint8) {
+func (o *opSetIToNNN) Execute(_ *uint8) {
 	cpu.i = o.nnn
 }
 
-type SetXToRandom struct {
+type opSetXToRandom struct {
 	x  uint16
 	nn uint16
 }
 
-func (o *SetXToRandom) Execute(cpu *Processor, _ *uint8) {
+func (o *opSetXToRandom) Execute(_ *uint8) {
 	randomByte := byte(rand.Uint32N(256))
 	cpu.v[o.x] = randomByte & byte(o.nn)
 }
 
-type DrawSprite struct {
+type opDrawSprite struct {
 	x uint16
 	y uint16
 	n uint16
 }
 
-func (o *DrawSprite) Execute(cpu *Processor, info *uint8) {
-	cpu.DrawSprite(cpu.v[o.x], cpu.v[o.y], byte(o.n))
+func (o *opDrawSprite) Execute(info *uint8) {
+	DrawSprite(cpu.v[o.x], cpu.v[o.y], byte(o.n))
 	*info |= Redraw
 }
 
-type StepIfKeyDown struct {
+type opStepIfKeyDown struct {
 	x uint16
 }
 
-func (o *StepIfKeyDown) Execute(cpu *Processor, _ *uint8) {
+func (o *opStepIfKeyDown) Execute(_ *uint8) {
 	key := cpu.v[o.x] & 0x0F
 	if cpu.keyState[key].Load() {
 		cpu.pc += 2
 	}
 }
 
-type StepIfKeyUp struct {
+type opStepIfKeyUp struct {
 	x uint16
 }
 
-func (o *StepIfKeyUp) Execute(cpu *Processor, _ *uint8) {
+func (o *opStepIfKeyUp) Execute(_ *uint8) {
 	key := cpu.v[o.x] & 0x0F
 	if !cpu.keyState[key].Load() {
 		cpu.pc += 2
 	}
 }
 
-type SetXToDelay struct {
+type opSetXToDelay struct {
 	x uint16
 }
 
-func (o *SetXToDelay) Execute(cpu *Processor, _ *uint8) {
+func (o *opSetXToDelay) Execute(_ *uint8) {
 	cpu.v[o.x] = cpu.delay
 }
 
-type PauseUntilKeyPressed struct {
+type opPauseUntilKeyPressed struct {
 	x uint16
 }
 
-func (o *PauseUntilKeyPressed) Execute(cpu *Processor, _ *uint8) {
+func (o *opPauseUntilKeyPressed) Execute(_ *uint8) {
 	var keyPressed bool
 
 	for i := range uint8(len(cpu.keyState)) {
@@ -299,44 +299,44 @@ func (o *PauseUntilKeyPressed) Execute(cpu *Processor, _ *uint8) {
 	}
 }
 
-type SetDelayToX struct {
+type opSetDelayToX struct {
 	x uint16
 }
 
-func (o *SetDelayToX) Execute(cpu *Processor, _ *uint8) {
+func (o *opSetDelayToX) Execute(_ *uint8) {
 	cpu.delay = cpu.v[o.x]
 }
 
-type SetSoundToX struct {
+type opSetSoundToX struct {
 	x uint16
 }
 
-func (o *SetSoundToX) Execute(cpu *Processor, _ *uint8) {
+func (o *opSetSoundToX) Execute(_ *uint8) {
 	cpu.sound = cpu.v[o.x]
 }
 
-type SetIToX struct {
+type opSetIToX struct {
 	x uint16
 }
 
-func (o *SetIToX) Execute(cpu *Processor, _ *uint8) {
+func (o *opSetIToX) Execute(_ *uint8) {
 	cpu.i += uint16(cpu.v[o.x])
 }
 
-type SetIToSymbol struct {
+type opSetIToSymbol struct {
 	x uint16
 }
 
-func (o *SetIToSymbol) Execute(cpu *Processor, _ *uint8) {
+func (o *opSetIToSymbol) Execute(_ *uint8) {
 	digit := uint16(cpu.v[o.x] & 0x0F)
 	cpu.i = FontStartAddress + (digit * 5)
 }
 
-type BinaryCodedDecimal struct {
+type opBinaryCodedDecimal struct {
 	x uint16
 }
 
-func (o *BinaryCodedDecimal) Execute(cpu *Processor, _ *uint8) {
+func (o *opBinaryCodedDecimal) Execute(_ *uint8) {
 	// Takes the number in register VX (which is one byte, so it can be any number from
 	// 0 to 255) and converts it to three decimal digits, storing these digits in memory
 	// at the address in the index register I. For example, if VX contains 156 (or 9C in
@@ -392,27 +392,27 @@ func (o *BinaryCodedDecimal) Execute(cpu *Processor, _ *uint8) {
 	cpu.memory[cpu.i+2] = byte(bcd & 0xF)        // Ones
 }
 
-type SetRegistersToMemory struct {
+type opSetRegistersToMemory struct {
 	x uint16
 }
 
-func (o *SetRegistersToMemory) Execute(cpu *Processor, _ *uint8) {
+func (o *opSetRegistersToMemory) Execute(_ *uint8) {
 	for i := uint16(0); i <= o.x; i++ {
 		cpu.memory[cpu.i+i] = cpu.v[i]
 	}
 }
 
-type SetMemoryToRegisters struct {
+type opSetMemoryToRegisters struct {
 	x uint16
 }
 
-func (o *SetMemoryToRegisters) Execute(cpu *Processor, _ *uint8) {
+func (o *opSetMemoryToRegisters) Execute(_ *uint8) {
 	for i := uint16(0); i <= o.x; i++ {
 		cpu.v[i] = cpu.memory[cpu.i+i]
 	}
 }
 
-func Decode(opcode uint16) OpCode {
+func decode(opcode uint16) operation {
 	// First nibble of the opcode is the operation kind.
 	kind := (opcode & 0xF000) >> 12
 
@@ -435,89 +435,89 @@ func Decode(opcode uint16) OpCode {
 	case 0x0:
 		switch opcode {
 		case 0x00E0:
-			return &ClearScreen{}
+			return &opClearScreen{}
 		case 0x00EE:
-			return &SubroutineReturn{}
+			return &opSubroutineReturn{}
 		default:
 			panic("unknown 0x0 opcode")
 		}
 	case 0x1:
-		return &JumpToLocation{nnn}
+		return &opJumpToLocation{nnn}
 	case 0x2:
-		return &SubroutineCall{nnn}
+		return &opSubroutineCall{nnn}
 	case 0x3:
-		return &StepIfXEqualsNN{x, nn}
+		return &opStepIfXEqualsNN{x, nn}
 	case 0x4:
-		return &StepIfXNotEqualsNN{x, nn}
+		return &opStepIfXNotEqualsNN{x, nn}
 	case 0x5:
-		return &StepIfXEqualsY{x, y}
+		return &opStepIfXEqualsY{x, y}
 	case 0x6:
-		return &SetXToNN{x, nn}
+		return &opSetXToNN{x, nn}
 	case 0x7:
-		return &AddNNToX{x, nn}
+		return &opAddNNToX{x, nn}
 	case 0x8:
 		switch n {
 		case 0x0:
-			return &SetXToY{x, y}
+			return &opSetXToY{x, y}
 		case 0x1:
-			return &OrXY{x, y}
+			return &opOrXY{x, y}
 		case 0x2:
-			return &AndXY{x, y}
+			return &opAndXY{x, y}
 		case 0x3:
-			return &XOrXY{x, y}
+			return &opXOrXY{x, y}
 		case 0x4:
-			return &AddXY{x, y}
+			return &opAddXY{x, y}
 		case 0x5:
-			return &SubtractYFromX{x, y}
+			return &opSubtractYFromX{x, y}
 		case 0x6:
-			return &ShiftRightX{x}
+			return &opShiftRightX{x}
 		case 0x7:
-			return &SubtractXFromY{x, y}
+			return &opSubtractXFromY{x, y}
 		case 0xE:
-			return &ShiftLeftX{x}
+			return &opShiftLeftX{x}
 		default:
 			panic("unknown 0x8 opcode")
 		}
 	case 0x9:
-		return &StepIfXNotEqualsY{x, y}
+		return &opStepIfXNotEqualsY{x, y}
 	case 0xA:
-		return &SetIToNNN{nnn}
+		return &opSetIToNNN{nnn}
 	case 0xB:
-		return &JumpWithOffset{nnn}
+		return &opJumpWithOffset{nnn}
 	case 0xC:
-		return &SetXToRandom{x, nn}
+		return &opSetXToRandom{x, nn}
 	case 0xD:
-		return &DrawSprite{x, y, n}
+		return &opDrawSprite{x, y, n}
 	case 0xE:
 		switch nn {
 		case 0x9E:
-			return &StepIfKeyDown{x}
+			return &opStepIfKeyDown{x}
 
 		case 0xA1:
-			return &StepIfKeyUp{x}
+			return &opStepIfKeyUp{x}
 		default:
 			panic("unknown 0xE opcode")
 		}
 	case 0xF:
 		switch nn {
 		case 0x07:
-			return &SetXToDelay{x}
+			return &opSetXToDelay{x}
 		case 0x0A:
-			return &PauseUntilKeyPressed{x}
+			return &opPauseUntilKeyPressed{x}
 		case 0x15:
-			return &SetDelayToX{x}
+			return &opSetDelayToX{x}
 		case 0x18:
-			return &SetSoundToX{x}
+			return &opSetSoundToX{x}
 		case 0x1E:
-			return &SetIToX{x}
+			return &opSetIToX{x}
 		case 0x29:
-			return &SetIToSymbol{x}
+			return &opSetIToSymbol{x}
 		case 0x33:
-			return &BinaryCodedDecimal{x}
+			return &opBinaryCodedDecimal{x}
 		case 0x55:
-			return &SetRegistersToMemory{x}
+			return &opSetRegistersToMemory{x}
 		case 0x65:
-			return &SetMemoryToRegisters{x}
+			return &opSetMemoryToRegisters{x}
 		default:
 			panic("unknown 0xF opcode")
 		}
