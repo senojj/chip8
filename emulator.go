@@ -115,7 +115,7 @@ func (e *Emulator) Run() {
 
 			info := chip8.Step()
 
-			pos := chip8.ProgramCounter() - chip8.ProgramStartAddress
+			pos := (chip8.ProgramCounter() - chip8.ProgramStartAddress) / 2
 
 			redraw := (info & chip8.Redraw) != 0
 			sound := (info & chip8.Sound) != 0

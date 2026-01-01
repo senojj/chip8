@@ -492,7 +492,6 @@ func decode(opcode uint16) operation {
 		switch nn {
 		case 0x9E:
 			return &opStepIfKeyDown{x}
-
 		case 0xA1:
 			return &opStepIfKeyUp{x}
 		default:
