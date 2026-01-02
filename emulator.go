@@ -16,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -90,7 +91,22 @@ func (e *Emulator) Run() {
 		},
 	)
 
-	box := container.NewBorder(nil, nil, list, nil, image)
+	var paused atomic.Bool
+	var next atomic.Bool
+
+	toolbar := widget.NewToolbar(
+		widget.NewToolbarAction(theme.MediaPlayIcon(), func() {
+			paused.Store(false)
+		}),
+		widget.NewToolbarAction(theme.MediaPauseIcon(), func() {
+			paused.Store(true)
+		}),
+		widget.NewToolbarAction(theme.MediaSkipNextIcon(), func() {
+			next.Store(true)
+		}),
+	)
+
+	box := container.NewBorder(toolbar, nil, list, nil, image)
 
 	w.SetContent(box)
 
@@ -111,6 +127,13 @@ func (e *Emulator) Run() {
 		for range cpuTicker.C {
 			if !e.running.Load() {
 				break
+			}
+
+			if paused.Load() {
+				if !next.Load() {
+					continue
+				}
+				next.Store(false)
 			}
 
 			info := chip8.Step()
