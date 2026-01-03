@@ -16,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -29,6 +30,8 @@ var keyMap = map[fyne.KeyName]uint8{
 
 type Emulator struct {
 	beep    Beep
+	paused  atomic.Bool
+	next    atomic.Bool
 	running atomic.Bool
 }
 
@@ -39,6 +42,16 @@ func (e *Emulator) onKeyDown(k *fyne.KeyEvent) {
 }
 
 func (e *Emulator) onKeyUp(k *fyne.KeyEvent) {
+	if k.Name == fyne.KeyP {
+		e.paused.Store(!e.paused.Load())
+		return
+	}
+
+	if k.Name == fyne.KeyN {
+		e.next.Store(true)
+		return
+	}
+
 	if hex, ok := keyMap[k.Name]; ok {
 		chip8.SetKey(hex, false)
 	}
@@ -101,22 +114,24 @@ func (e *Emulator) Run() {
 		},
 	)
 
-	var paused atomic.Bool
-	var next atomic.Bool
-
 	toolbar := widget.NewToolbar(
 		widget.NewToolbarAction(theme.MediaPlayIcon(), func() {
-			paused.Store(false)
+			e.paused.Store(false)
 		}),
 		widget.NewToolbarAction(theme.MediaPauseIcon(), func() {
-			paused.Store(true)
+			e.paused.Store(true)
 		}),
 		widget.NewToolbarAction(theme.MediaSkipNextIcon(), func() {
-			next.Store(true)
+			e.next.Store(true)
 		}),
 	)
 
-	box := container.NewBorder(toolbar, nil, opcodeList, registerList, image)
+	programCounter := widget.NewLabel(fmt.Sprintf("PC: %04X", chip8.ProgramCounter()))
+	index := widget.NewLabel(fmt.Sprintf("I: %04X", chip8.Index()))
+
+	hbox := container.NewHBox(layout.NewSpacer(), programCounter, layout.NewSpacer(), index, layout.NewSpacer())
+
+	box := container.NewBorder(toolbar, hbox, opcodeList, registerList, image)
 
 	w.SetContent(box)
 
@@ -141,11 +156,11 @@ func (e *Emulator) Run() {
 				break
 			}
 
-			if paused.Load() {
-				if !next.Load() {
+			if e.paused.Load() {
+				if !e.next.Load() {
 					continue
 				}
-				next.Store(false)
+				e.next.Store(false)
 			}
 
 			if ctr < 1 {
@@ -207,6 +222,9 @@ func (e *Emulator) Run() {
 				opcodeList.Refresh()
 
 				registerList.Refresh()
+
+				programCounter.SetText(fmt.Sprintf("PC: %04X", chip8.ProgramCounter()))
+				index.SetText(fmt.Sprintf("I: %04X", chip8.Index()))
 			})
 		}
 	})

@@ -173,6 +173,10 @@ func Register(v uint8) byte {
 	return cpu.v[key]
 }
 
+func Index() uint16 {
+	return cpu.i
+}
+
 func ProgramCounter() uint16 {
 	return cpu.pc
 }
