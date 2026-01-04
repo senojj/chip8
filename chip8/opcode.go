@@ -28,21 +28,20 @@ func clearScreen(info *uint8) {
 }
 
 func callSubroutine(nnn uint16) {
-	item := &node{
-		value: cpu.pc,
-		next:  cpu.stack,
+	if int(cpu.sp) >= len(cpu.stack) {
+		panic("stack overflow")
 	}
-	cpu.stack = item
+	cpu.stack[cpu.sp] = cpu.pc
+	cpu.sp++
 	cpu.pc = nnn
 }
 
 func returnFromSubroutine() {
-	item := cpu.stack
-	if item == nil {
-		panic("return from empty stack")
+	if cpu.sp == 0 {
+		panic("stack underflow")
 	}
-	cpu.pc = item.value
-	cpu.stack = item.next
+	cpu.sp--
+	cpu.pc = cpu.stack[cpu.sp]
 }
 
 func jumpToLocation(nnn uint16) {

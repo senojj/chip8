@@ -64,17 +64,13 @@ var fontSet = []byte{
 	0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 }
 
-type node struct {
-	value uint16
-	next  *node
-}
-
 type processor struct {
 	memory          [4096]byte
 	v               [RegisterCount]byte
 	keyState        [KeyCount]atomic.Bool
 	display         [Area]byte
-	stack           *node
+	stack           [16]uint16
+	sp              uint8
 	pc              uint16
 	i               uint16
 	delay           uint8
@@ -89,30 +85,7 @@ func init() {
 }
 
 func Reset() {
-	for i := range len(cpu.memory) {
-		cpu.memory[i] = 0
-	}
-
-	for i := range len(cpu.v) {
-		cpu.v[i] = 0
-	}
-
-	for i := range len(cpu.keyState) {
-		cpu.keyState[i].Store(false)
-	}
-
-	for i := range len(cpu.display) {
-		cpu.display[i] = 0
-	}
-
-	cpu.stack = nil
-	cpu.pc = ProgramStartAddress
-	cpu.i = 0
-	cpu.delay = 0
-	cpu.sound = 0
-
-	var t time.Time
-	cpu.lastTimerUpdate = t
+	cpu = processor{}
 
 	written := Write(FontStartAddress, fontSet)
 	if int(written) < len(fontSet) {
@@ -187,6 +160,10 @@ func DrawSprite(x, y, h byte) {
 func Register(v uint8) byte {
 	key := v & 0xF
 	return cpu.v[key]
+}
+
+func StackDepth() int {
+	return int(cpu.sp)
 }
 
 func Index() uint16 {

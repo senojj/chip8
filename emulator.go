@@ -21,6 +21,7 @@ import (
 	"emul8/chip8"
 	"image"
 	"image/color"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -186,7 +187,9 @@ func (e *Emulator) Run() {
 	h = EncodeToHexString(b)
 	index := widget.NewLabel("I: " + h)
 
-	hbox := container.NewHBox(layout.NewSpacer(), programCounter, layout.NewSpacer(), index, layout.NewSpacer())
+	stackDepth := widget.NewLabel("Stack: " + strconv.Itoa(chip8.StackDepth()))
+
+	hbox := container.NewHBox(layout.NewSpacer(), programCounter, layout.NewSpacer(), index, layout.NewSpacer(), stackDepth, layout.NewSpacer())
 
 	box := container.NewBorder(toolbar, hbox, opcodeList, registerList, image)
 
@@ -260,6 +263,10 @@ func (e *Emulator) Run() {
 				}
 			}
 
+			pc := chip8.ProgramCounter()
+			i := chip8.Index()
+			sd := chip8.StackDepth()
+
 			fyne.Do(func() {
 				if redraw {
 					image.Refresh()
@@ -270,13 +277,15 @@ func (e *Emulator) Run() {
 
 				registerList.Refresh()
 
-				b := Uint16ToBytes(chip8.ProgramCounter())
+				b := Uint16ToBytes(pc)
 				h := EncodeToHexString(b)
 				programCounter.SetText("PC: " + h)
 
-				b = Uint16ToBytes(chip8.Index())
+				b = Uint16ToBytes(i)
 				h = EncodeToHexString(b)
 				index.SetText("I: " + h)
+
+				stackDepth.SetText("Stack: " + strconv.Itoa(sd))
 			})
 		}
 	})
