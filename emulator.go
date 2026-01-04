@@ -197,6 +197,8 @@ func (e *Emulator) Run() {
 
 	w.Resize(fyne.NewSize(float32(chip8.Width*10), float32(chip8.Height*10))) // 10x scale for visibility
 
+	w.SetFixedSize(true)
+
 	e.running.Store(true)
 
 	var wg sync.WaitGroup
@@ -225,11 +227,10 @@ func (e *Emulator) Run() {
 			b := Uint16ToBytes(opcode)
 			opstr := EncodeToHexString(b[:])
 
-			opcodeData = append([]string{opstr}, opcodeData...)
-
-			if len(opcodeData) > 10 {
-				opcodeData = opcodeData[:10]
-			}
+			var data [16]string
+			data[0] = opstr
+			copy(data[1:], opcodeData)
+			opcodeData = data[:]
 
 			_ = boundOpcodes.Reload()
 
