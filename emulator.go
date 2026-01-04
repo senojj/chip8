@@ -258,13 +258,12 @@ func (e *Emulator) Run() {
 					}
 					buffer.Set(x, y, c) // Directly sets pixels in the buffer
 				}
-
-				fyne.Do(func() {
-					image.Refresh()
-				})
 			}
 
 			fyne.Do(func() {
+				if redraw {
+					image.Refresh()
+				}
 				opcodeList.Select(widget.ListItemID(0))
 				opcodeList.ScrollToTop()
 				opcodeList.Refresh()
