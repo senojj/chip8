@@ -217,7 +217,7 @@ func Step() uint8 {
 
 	cpu.pc += 2
 
-	decode(opcode).Execute(&info)
+	execute(opcode, &info)
 
 	if time.Since(cpu.lastTimerUpdate) >= TimerRate {
 		if cpu.sound > 0 {
