@@ -83,88 +83,88 @@ func (p *Processor) Execute(op Opcode, info *uint8) {
 	case 0x0:
 		switch uint16(op) {
 		case 0x00E0:
-			clearScreen(p, info)
+			p.clearScreen(info)
 		case 0x00EE:
-			returnFromSubroutine(p)
+			p.returnFromSubroutine()
 		default:
 			panic("unknown 0x0 opcode")
 		}
 	case 0x1:
-		jumpToLocation(p, op.nnn())
+		p.jumpToLocation(op.nnn())
 	case 0x2:
-		callSubroutine(p, op.nnn())
+		p.callSubroutine(op.nnn())
 	case 0x3:
-		stepIfXEqualsNN(p, op.x(), op.nn())
+		p.stepIfXEqualsNN(op.x(), op.nn())
 	case 0x4:
-		stepIfXNotEqualsNN(p, op.x(), op.nn())
+		p.stepIfXNotEqualsNN(op.x(), op.nn())
 	case 0x5:
-		stepIfXEqualsY(p, op.x(), op.y())
+		p.stepIfXEqualsY(op.x(), op.y())
 	case 0x6:
-		setXToNN(p, op.x(), op.nn())
+		p.setXToNN(op.x(), op.nn())
 	case 0x7:
-		addNNToX(p, op.x(), op.nn())
+		p.addNNToX(op.x(), op.nn())
 	case 0x8:
 		switch op.n() {
 		case 0x0:
-			setXToY(p, op.x(), op.y())
+			p.setXToY(op.x(), op.y())
 		case 0x1:
-			orXY(p, op.x(), op.y())
+			p.orXY(op.x(), op.y())
 		case 0x2:
-			andXY(p, op.x(), op.y())
+			p.andXY(op.x(), op.y())
 		case 0x3:
-			xorXY(p, op.x(), op.y())
+			p.xorXY(op.x(), op.y())
 		case 0x4:
-			addXY(p, op.x(), op.y())
+			p.addXY(op.x(), op.y())
 		case 0x5:
-			subtractYFromX(p, op.x(), op.y())
+			p.subtractYFromX(op.x(), op.y())
 		case 0x6:
-			shiftRightX(p, op.x())
+			p.shiftRightX(op.x())
 		case 0x7:
-			subtractXFromY(p, op.x(), op.y())
+			p.subtractXFromY(op.x(), op.y())
 		case 0xE:
-			shiftLeftX(p, op.x())
+			p.shiftLeftX(op.x())
 		default:
 			panic("unknown 0x8 opcode")
 		}
 	case 0x9:
-		stepIfXNotEqualsY(p, op.x(), op.y())
+		p.stepIfXNotEqualsY(op.x(), op.y())
 	case 0xA:
-		setIToNNN(p, op.nnn())
+		p.setIToNNN(op.nnn())
 	case 0xB:
-		jumpWithOffset(p, op.nnn())
+		p.jumpWithOffset(op.nnn())
 	case 0xC:
-		setXToRandom(p, op.x(), op.nn())
+		p.setXToRandom(op.x(), op.nn())
 	case 0xD:
-		drawSprite(p, op.x(), op.y(), op.n(), info)
+		p.drawSprite(op.x(), op.y(), op.n(), info)
 	case 0xE:
 		switch op.nn() {
 		case 0x9E:
-			stepIfKeyDown(p, op.x())
+			p.stepIfKeyDown(op.x())
 		case 0xA1:
-			stepIfKeyUp(p, op.x())
+			p.stepIfKeyUp(op.x())
 		default:
 			panic("unknown 0xE opcode")
 		}
 	case 0xF:
 		switch op.nn() {
 		case 0x07:
-			setXToDelay(p, op.x())
+			p.setXToDelay(op.x())
 		case 0x0A:
-			pauseUntilKeyPressed(p, op.x())
+			p.pauseUntilKeyPressed(op.x())
 		case 0x15:
-			setDelayToX(p, op.x())
+			p.setDelayToX(op.x())
 		case 0x18:
-			setSoundToX(p, op.x())
+			p.setSoundToX(op.x())
 		case 0x1E:
-			setIToX(p, op.x())
+			p.setIToX(op.x())
 		case 0x29:
-			setIToSymbol(p, op.x())
+			p.setIToSymbol(op.x())
 		case 0x33:
-			binaryCodedDecimal(p, op.x())
+			p.binaryCodedDecimal(op.x())
 		case 0x55:
-			setRegistersToMemory(p, op.x())
+			p.setRegistersToMemory(op.x())
 		case 0x65:
-			setMemoryToRegisters(p, op.x())
+			p.setMemoryToRegisters(op.x())
 		default:
 			panic("unknown 0xF opcode")
 		}
@@ -212,38 +212,6 @@ func (p *Processor) Load(b []byte) {
 
 func (p *Processor) SetKey(key uint8, value bool) {
 	p.keyState[key&0x0F].Store(value)
-}
-
-func (p *Processor) DrawSprite(x, y, h uint8) {
-	startX := uint16(p.v[x]) & uint16(Width-1)
-	startY := uint16(p.v[y]) & uint16(Height-1)
-
-	p.v[CarryFlag] = 0 // Reset the collision register.
-
-	for row := range uint16(h) {
-		if startY+row >= uint16(Height) {
-			// Reached the bottom of the display.
-			break
-		}
-
-		sprite := p.memory[p.i+row]
-
-		for col := range uint16(8) {
-			if startX+col >= uint16(Width) {
-				break
-			}
-
-			if (sprite & (0x80 >> col)) != 0 {
-				index := (startX + col) + ((startY + row) * uint16(Width))
-
-				if p.display[index] == 1 {
-					// Pixel was already on. This indicates a graphical object collision.
-					p.v[CarryFlag] = 1 // Turn on the collision register.
-				}
-				p.display[index] ^= 1
-			}
-		}
-	}
 }
 
 func (p *Processor) Register(v uint8) uint8 {

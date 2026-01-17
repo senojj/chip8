@@ -21,14 +21,14 @@ import (
 	"math/rand/v2"
 )
 
-func clearScreen(p *Processor, info *uint8) {
+func (p *Processor) clearScreen(info *uint8) {
 	for i := range p.display {
 		p.display[i] = 0
 	}
 	*info |= Redraw
 }
 
-func callSubroutine(p *Processor, nnn uint16) {
+func (p *Processor) callSubroutine(nnn uint16) {
 	if int(p.sp) >= len(p.stack) {
 		panic("stack overflow")
 	}
@@ -37,7 +37,7 @@ func callSubroutine(p *Processor, nnn uint16) {
 	p.pc = nnn
 }
 
-func returnFromSubroutine(p *Processor) {
+func (p *Processor) returnFromSubroutine() {
 	if p.sp == 0 {
 		panic("stack underflow")
 	}
@@ -45,69 +45,69 @@ func returnFromSubroutine(p *Processor) {
 	p.pc = p.stack[p.sp]
 }
 
-func jumpToLocation(p *Processor, nnn uint16) {
+func (p *Processor) jumpToLocation(nnn uint16) {
 	p.pc = nnn
 }
 
-func jumpWithOffset(p *Processor, nnn uint16) {
+func (p *Processor) jumpWithOffset(nnn uint16) {
 	p.pc = nnn + uint16(p.v[0x0])
 }
 
-func stepIfXEqualsNN(p *Processor, x, nn uint8) {
+func (p *Processor) stepIfXEqualsNN(x, nn uint8) {
 	if p.v[x] == byte(nn) {
 		p.pc += 2
 	}
 }
 
-func stepIfXNotEqualsNN(p *Processor, x, nn uint8) {
+func (p *Processor) stepIfXNotEqualsNN(x, nn uint8) {
 	if p.v[x] != byte(nn) {
 		p.pc += 2
 	}
 }
 
-func stepIfXEqualsY(p *Processor, x, y uint8) {
+func (p *Processor) stepIfXEqualsY(x, y uint8) {
 	if p.v[x] == p.v[y] {
 		p.pc += 2
 	}
 }
 
-func stepIfXNotEqualsY(p *Processor, x, y uint8) {
+func (p *Processor) stepIfXNotEqualsY(x, y uint8) {
 	if p.v[x] != p.v[y] {
 		p.pc += 2
 	}
 }
 
-func setXToNN(p *Processor, x, nn uint8) {
+func (p *Processor) setXToNN(x, nn uint8) {
 	p.v[x] = byte(nn)
 }
 
-func addNNToX(p *Processor, x, nn uint8) {
+func (p *Processor) addNNToX(x, nn uint8) {
 	p.v[x] += byte(nn)
 }
 
-func setXToY(p *Processor, x, y uint8) {
+func (p *Processor) setXToY(x, y uint8) {
 	p.v[x] = p.v[y]
 }
 
-func orXY(p *Processor, x, y uint8) {
+func (p *Processor) orXY(x, y uint8) {
 	// This operation traditionally resets the carry flag.
 	p.v[CarryFlag] = 0
 	p.v[x] |= p.v[y]
 }
 
-func andXY(p *Processor, x, y uint8) {
+func (p *Processor) andXY(x, y uint8) {
 	// This operation traditionally resets the carry flag.
 	p.v[CarryFlag] = 0
 	p.v[x] &= p.v[y]
 }
 
-func xorXY(p *Processor, x, y uint8) {
+func (p *Processor) xorXY(x, y uint8) {
 	// This operation traditionally resets the carry flag.
 	p.v[CarryFlag] = 0
 	p.v[x] ^= p.v[y]
 }
 
-func addXY(p *Processor, x, y uint8) {
+func (p *Processor) addXY(x, y uint8) {
 	sum := uint16(p.v[x]) + uint16(p.v[y])
 	// This operation traditionally resets the carry flag.
 	p.v[CarryFlag] = 0
@@ -117,7 +117,7 @@ func addXY(p *Processor, x, y uint8) {
 	p.v[x] = byte(sum & 0xFF)
 }
 
-func subtractYFromX(p *Processor, x, y uint8) {
+func (p *Processor) subtractYFromX(x, y uint8) {
 	p.v[CarryFlag] = 0
 	if p.v[x] >= p.v[y] {
 		p.v[CarryFlag] = 1
@@ -125,7 +125,7 @@ func subtractYFromX(p *Processor, x, y uint8) {
 	p.v[x] -= p.v[y]
 }
 
-func subtractXFromY(p *Processor, x, y uint8) {
+func (p *Processor) subtractXFromY(x, y uint8) {
 	p.v[CarryFlag] = 0
 	if p.v[y] >= p.v[x] {
 		p.v[CarryFlag] = 1
@@ -133,49 +133,77 @@ func subtractXFromY(p *Processor, x, y uint8) {
 	p.v[x] = p.v[y] - p.v[x]
 }
 
-func shiftRightX(p *Processor, x uint8) {
+func (p *Processor) shiftRightX(x uint8) {
 	p.v[CarryFlag] = p.v[x] & 0x1
 	p.v[x] >>= 1
 }
 
-func shiftLeftX(p *Processor, x uint8) {
+func (p *Processor) shiftLeftX(x uint8) {
 	p.v[CarryFlag] = (p.v[x] & 0x80) >> 7
 	p.v[x] <<= 1
 }
 
-func setIToNNN(p *Processor, nnn uint16) {
+func (p *Processor) setIToNNN(nnn uint16) {
 	p.i = nnn
 }
 
-func setXToRandom(p *Processor, x, nn uint8) {
+func (p *Processor) setXToRandom(x, nn uint8) {
 	randomByte := byte(rand.Uint32N(256))
 	p.v[x] = randomByte & byte(nn)
 }
 
-func drawSprite(p *Processor, x, y, n uint8, info *uint8) {
-	p.DrawSprite(x, y, n)
+func (p *Processor) drawSprite(x, y, n uint8, info *uint8) {
+	startX := uint16(p.v[x]) & uint16(Width-1)
+	startY := uint16(p.v[y]) & uint16(Height-1)
+
+	p.v[CarryFlag] = 0 // Reset the collision register.
+
+	for row := range uint16(n) {
+		if startY+row >= uint16(Height) {
+			// Reached the bottom of the display.
+			break
+		}
+
+		sprite := p.memory[p.i+row]
+
+		for col := range uint16(8) {
+			if startX+col >= uint16(Width) {
+				break
+			}
+
+			if (sprite & (0x80 >> col)) != 0 {
+				index := (startX + col) + ((startY + row) * uint16(Width))
+
+				if p.display[index] == 1 {
+					// Pixel was already on. This indicates a graphical object collision.
+					p.v[CarryFlag] = 1 // Turn on the collision register.
+				}
+				p.display[index] ^= 1
+			}
+		}
+	}
 	*info |= Redraw
 }
 
-func stepIfKeyDown(p *Processor, x uint8) {
+func (p *Processor) stepIfKeyDown(x uint8) {
 	key := p.v[x] & 0x0F
 	if p.keyState[key].Load() {
 		p.pc += 2
 	}
 }
 
-func stepIfKeyUp(p *Processor, x uint8) {
+func (p *Processor) stepIfKeyUp(x uint8) {
 	key := p.v[x] & 0x0F
 	if !p.keyState[key].Load() {
 		p.pc += 2
 	}
 }
 
-func setXToDelay(p *Processor, x uint8) {
+func (p *Processor) setXToDelay(x uint8) {
 	p.v[x] = p.delay
 }
 
-func pauseUntilKeyPressed(p *Processor, x uint8) {
+func (p *Processor) pauseUntilKeyPressed(x uint8) {
 	var keyPressed bool
 
 	for i := range uint8(len(p.keyState)) {
@@ -191,24 +219,24 @@ func pauseUntilKeyPressed(p *Processor, x uint8) {
 	}
 }
 
-func setDelayToX(p *Processor, x uint8) {
+func (p *Processor) setDelayToX(x uint8) {
 	p.delay = p.v[x]
 }
 
-func setSoundToX(p *Processor, x uint8) {
+func (p *Processor) setSoundToX(x uint8) {
 	p.sound = p.v[x]
 }
 
-func setIToX(p *Processor, x uint8) {
+func (p *Processor) setIToX(x uint8) {
 	p.i += uint16(p.v[x])
 }
 
-func setIToSymbol(p *Processor, x uint8) {
+func (p *Processor) setIToSymbol(x uint8) {
 	digit := uint16(p.v[x] & 0x0F)
 	p.i = FontStartAddress + (digit * 5)
 }
 
-func binaryCodedDecimal(p *Processor, x uint8) {
+func (p *Processor) binaryCodedDecimal(x uint8) {
 	// Takes the number in register VX (which is one byte, so it can be any number from
 	// 0 to 255) and converts it to three decimal digits, storing these digits in memory
 	// at the address in the index register I. For example, if VX contains 156 (or 9C in
@@ -264,13 +292,13 @@ func binaryCodedDecimal(p *Processor, x uint8) {
 	p.memory[p.i+2] = byte(bcd & 0xF)        // Ones
 }
 
-func setRegistersToMemory(p *Processor, x uint8) {
+func (p *Processor) setRegistersToMemory(x uint8) {
 	for i := uint8(0); i <= x; i++ {
 		p.memory[p.i+uint16(i)] = p.v[i]
 	}
 }
 
-func setMemoryToRegisters(p *Processor, x uint8) {
+func (p *Processor) setMemoryToRegisters(x uint8) {
 	for i := uint8(0); i <= x; i++ {
 		p.v[i] = p.memory[p.i+uint16(i)]
 	}
