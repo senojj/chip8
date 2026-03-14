@@ -6,7 +6,7 @@ require (
 	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/generator v0.0.0-20191129013639-fe5438877d8c
 	github.com/gordonklaus/portaudio v0.0.0-20250206071425-98a94950218b
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.20.0
 )
 
 require (
